@@ -22,17 +22,48 @@ from pathlib import Path
 # The image sits next to this program, wherever the repository is mounted.
 SOURCE_IMAGE = Path(__file__).resolve().parent / "entry.png"
 
+# The grader tells a PNG from a JPEG by the file's first bytes; check the same.
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
 # The grader provides /output; locally MAKEFUN_OUTPUT_DIR names the directory.
 OUTPUT_DIR = Path(os.environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
 
 
+def check_source_image() -> None:
+    """Fail loudly unless the image exists beside this program and is a PNG."""
+    if not SOURCE_IMAGE.is_file():
+        raise SystemExit(f"entry image missing: {SOURCE_IMAGE}")
+
+    with SOURCE_IMAGE.open("rb") as handle:
+        signature = handle.read(len(PNG_SIGNATURE))
+
+    if signature != PNG_SIGNATURE:
+        raise SystemExit(
+            f"entry image is not a PNG (bad signature {signature!r}): {SOURCE_IMAGE}"
+        )
+
+
+def prepare_output() -> Path:
+    """Create the output directory and its parents; name the file to write."""
+    try:
+        # parents=True also creates any missing parents, so a nested path works.
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise SystemExit(f"cannot use output directory {OUTPUT_DIR}: {exc}") from exc
+
+    return OUTPUT_DIR / "entry.png"
+
+
 def main() -> None:
-    """Create the output directory if needed, then copy the image into it."""
-    # parents=True also creates any missing parents, so a nested path works.
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    """Check the image, create the output directory if needed, then copy."""
+    check_source_image()
+
+    target = prepare_output()
 
     # copyfile writes exactly the source bytes, so two runs are identical.
-    shutil.copyfile(SOURCE_IMAGE, OUTPUT_DIR / "entry.png")
+    shutil.copyfile(SOURCE_IMAGE, target)
+
+    print(f"wrote {target}")
 
 
 if __name__ == "__main__":
